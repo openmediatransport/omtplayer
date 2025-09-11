@@ -1,0 +1,9 @@
+﻿[Unit]
+Description=OMT Player
+After=network.target
+
+[Service]
+ExecStart=/opt/omtplayer/omtplayer
+
+[Install]
+WantedBy=multi-user.target
