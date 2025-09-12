@@ -28,20 +28,32 @@ Interlaces sources will be displayed as progressive without any deinterlacing. T
 
 ## Instructions
 
-1. Install dotnet 8 on to device.
+1. Ensure that the Raspberry Pi OS is configued to boot to Console instead of Desktop.
+
+omtplayer outputs directly to the display which is not possible when the Desktop mode is running.
+
+This can be changed by running:
+
+```
+sudo raspi-config
+```
+
+And selecting Console under Boot Options - Desktop / CLI
+
+2. Install dotnet 8 on to device.
 
 Instructions can be found here:
 https://learn.microsoft.com/en-us/dotnet/iot/deployment
 
 **Important:** The --channel parameter should be set to 8.0
 
-2. Install Clang
+3. Install Clang
 
 ```
 sudo apt install clang
 ```
 
-3. Copy source code for the following repositories into a folder structure similar to the following:
+4. Copy source code for the following repositories into a folder structure similar to the following:
 
 ```
 /libvmx
@@ -49,23 +61,23 @@ sudo apt install clang
 /omtplayer
 ```
 
-4. Build libvmx by running /libvmx/build/buildlinuxarm64.sh
+5. Build libvmx by running /libvmx/build/buildlinuxarm64.sh
 
-5. Build libomtnet by running /libomtnet/build/buildall.sh
+6. Build libomtnet by running /libomtnet/build/buildall.sh
 
-6. Build omtplayer by running /omtplayer/build/buildlinuxarm64.sh
+7. Build omtplayer by running /omtplayer/build/buildlinuxarm64.sh
 
-7. All files needed will now be in /omtplayer/build/arm64
+8. All files needed will now be in /omtplayer/build/arm64
 
-8. Run /omtplayer/build/arm64/omtplayer to start the decoder.
+9. Run /omtplayer/build/arm64/omtplayer to start the decoder.
 
-9. Open a browser on another computer on the same network and connect to the web server to configure a source to connect to
+10. Open a browser on another computer on the same network and connect to the web server to configure a source to connect to
 
 ```
 http://piipaddress:8080/
 ```
 
-10. omtplayer will remember the last selected source for future sessions automatically.
+11. omtplayer will remember the last selected source for future sessions automatically.
 
 ## Install as a service (optional)
 
