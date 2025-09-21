@@ -71,13 +71,15 @@ sudo apt install clang
 
 9. Run /omtplayer/build/arm64/omtplayer to start the decoder.
 
-10. Open a browser on another computer on the same network and connect to the web server to configure a source to connect to
+10. **Important:** Make sure the HDMI display is connected to HDMI 1 on the Pi. This is the HDMI port directly next to the USB-C power port.
+
+11. Open a browser on another computer on the same network and connect to the web server to configure a source to connect to
 
 ```
 http://piipaddress:8080/
 ```
 
-11. omtplayer will remember the last selected source for future sessions automatically.
+12. omtplayer will remember the last selected source for future sessions automatically.
 
 ## Install as a service (optional)
 
