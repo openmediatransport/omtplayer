@@ -120,8 +120,8 @@ This configures the app to run automatically when the device starts up.
 1. Copy the omtplayer files from ~/omtplayer/build/arm64 into a folder called /opt/omtplayer on the system.
 
 ```
-mkdir /opt/omtplayer
-cp ~/omtplayer/build/arm64/* /opt/omtplayer/*
+sudo mkdir /opt/omtplayer
+sudo cp ~/omtplayer/build/arm64/* /opt/omtplayer/
 ```
 
 2. Copy the omtplayer.service template into the /etc/systemd/system/ folder.
