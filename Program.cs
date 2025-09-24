@@ -73,97 +73,102 @@ namespace omtplayer
                         dev.Dispose();
                         dev = new DRMDevice(devicePath);
                     }
+                    if (!running) break;
                 }
-                dev.StartEvents();
-
-                WriteLog("Display.Formats:");
-                DRMMode[] modes = connector.Modes;
-                if (modes != null)
+                if (connector != null)
                 {
-                    foreach (DRMMode mode in modes)
+
+                    dev.StartEvents();
+
+                    WriteLog("Display.Formats:");
+                    DRMMode[] modes = connector.Modes;
+                    if (modes != null)
                     {
-                        string? s = mode.ToString();
-                        if (s != null)
+                        foreach (DRMMode mode in modes)
                         {
-                            WriteLog(s);
+                            string? s = mode.ToString();
+                            if (s != null)
+                            {
+                                WriteLog(s);
+                            }
                         }
                     }
-                }
 
-                DRMPresenter? presenter = null;
-                int currentWidth = 0;
-                int currentHeight = 0;
-                bool currentInterlaced = false;
-                float currentFrameRate = 0;
-                string currentSource = server.Source;
+                    DRMPresenter? presenter = null;
+                    int currentWidth = 0;
+                    int currentHeight = 0;
+                    bool currentInterlaced = false;
+                    float currentFrameRate = 0;
+                    string currentSource = server.Source;
 
-                OMTReceive r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
-                OMTMediaFrame frame = new OMTMediaFrame();
-                while (running)
-                {
-                    if (currentSource != server.Source)
+                    OMTReceive r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
+                    OMTMediaFrame frame = new OMTMediaFrame();
+                    while (running)
                     {
-                        WriteLog("Source.Changed: " + server.Source);
-                        r.Dispose();
-                        currentSource = server.Source;
-                        r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
-                    }
-                    if (r.Receive(OMTFrameType.Video, 500, ref frame))
-                    {
-                        bool interlaced = false;
-                        if (frame.Flags.HasFlag(OMTVideoFlags.Interlaced)) interlaced = true;
-                        if (currentWidth != frame.Width || currentHeight != frame.Height || currentFrameRate != frame.FrameRate || currentInterlaced != interlaced)
+                        if (currentSource != server.Source)
                         {
-                            currentWidth = frame.Width;
-                            currentHeight = frame.Height;
-                            currentFrameRate = frame.FrameRate;
-                            currentInterlaced = interlaced;
+                            WriteLog("Source.Changed: " + server.Source);
+                            r.Dispose();
+                            currentSource = server.Source;
+                            r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
+                        }
+                        if (r.Receive(OMTFrameType.Video, 500, ref frame))
+                        {
+                            bool interlaced = false;
+                            if (frame.Flags.HasFlag(OMTVideoFlags.Interlaced)) interlaced = true;
+                            if (currentWidth != frame.Width || currentHeight != frame.Height || currentFrameRate != frame.FrameRate || currentInterlaced != interlaced)
+                            {
+                                currentWidth = frame.Width;
+                                currentHeight = frame.Height;
+                                currentFrameRate = frame.FrameRate;
+                                currentInterlaced = interlaced;
+                                if (presenter != null)
+                                {
+                                    dev.SetPresenter(null);
+                                    presenter.Dispose();
+                                    presenter = null;
+                                    WriteLog("Presenter.Clear");
+                                }
+                                WriteLog("Receive.NewFormat: " + frame.Width + "x" + frame.Height + " " + frame.FrameRate.ToString());
+                                DRMMode? mode = connector.FindNearestMode(frame.Width, frame.Height, frame.FrameRate, false);
+                                if (mode != null)
+                                {
+                                    WriteLog("Presenter.NearestMatch: " + mode.ToString());
+                                    presenter = new DRMPresenter(dev, connector, mode, 3);
+                                    dev.SetPresenter(presenter);
+                                    WriteLog("Presenter.Created");
+                                }
+                                else
+                                {
+                                    WriteLog("Presenter.NoDisplayModesFound");
+                                }
+                            }
                             if (presenter != null)
                             {
-                                dev.SetPresenter(null);
-                                presenter.Dispose();
-                                presenter = null;
-                                WriteLog("Presenter.Clear");
-                            }
-                            WriteLog("Receive.NewFormat: " + frame.Width + "x" + frame.Height + " " + frame.FrameRate.ToString());                                
-                            DRMMode? mode = connector.FindNearestMode(frame.Width, frame.Height, frame.FrameRate, false);
-                            if (mode != null)
-                            {
-                                WriteLog("Presenter.NearestMatch: " + mode.ToString());
-                                presenter = new DRMPresenter(dev, connector, mode, 3);
-                                dev.SetPresenter(presenter);
-                                WriteLog("Presenter.Created");
-                            }
-                            else
-                            {
-                                WriteLog("Presenter.NoDisplayModesFound");
+                                presenter.Enqueue(frame.Data, frame.Stride);
                             }
                         }
-                        if (presenter != null)
+                        else
                         {
-                            presenter.Enqueue(frame.Data, frame.Stride);
+                            WriteLog("Receive.NoFrame");
                         }
                     }
-                    else
+                    if (r != null)
                     {
-                        WriteLog("Receive.NoFrame");
+                        r.Dispose();
                     }
-                }
-                if (server != null)
-                {
-                    server.StopServer();
-                }
-                if (r != null)
-                {
-                    r.Dispose();
+                    if (presenter != null)
+                    {
+                        presenter.Dispose();
+                    }
                 }
                 if (dev != null)
                 {
                     dev.Dispose();
                 }
-                if (presenter != null)
+                if (server != null)
                 {
-                    presenter.Dispose();
+                    server.StopServer();
                 }
             }
             catch (Exception ex)

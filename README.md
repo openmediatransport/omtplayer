@@ -9,6 +9,7 @@ A built in web server runs on port 8080 by default allowing sources to be select
 * Raspberry Pi 5 with default OS installed. 2GB memory option is fine.
 * dotnet8
 * Clang
+* Git
 * libomtnet
 * libvmx
 
@@ -53,23 +54,54 @@ https://learn.microsoft.com/en-us/dotnet/iot/deployment
 sudo apt install clang
 ```
 
-4. Copy source code for the following repositories into a folder structure similar to the following:
+4. Copy source code for the following repositories into the home directory in a structure similar to the following:
 
 ```
-/libvmx
-/libomtnet
-/omtplayer
+~/libvmx
+~/libomtnet
+~/omtplayer
 ```
 
-5. Build libvmx by running /libvmx/build/buildlinuxarm64.sh
+The easiest way to do this is to git clone these repositories to the home directory using the commands below:
 
-6. Build libomtnet by running /libomtnet/build/buildall.sh
+```
+cd ~/
+git clone https://github.com/openmediatransport/libvmx
+git clone https://github.com/openmediatransport/libomtnet
+git clone https://github.com/openmediatransport/omtplayer
+```
 
-7. Build omtplayer by running /omtplayer/build/buildlinuxarm64.sh
+5. Build libvmx 
 
-8. All files needed will now be in /omtplayer/build/arm64
+```
+cd ~/libvmx/build
+chmod 755 buildlinuxarm64.sh
+./buildlinuxarm64.sh
+```
 
-9. Run /omtplayer/build/arm64/omtplayer to start the decoder.
+6. Build libomtnet 
+
+```
+cd ~/libomtnet/build
+chmod 755 buildall.sh
+./buildall.sh
+```
+
+7. Build omtplayer
+
+```
+cd ~/omtplayer/build
+chmod 755 buildlinuxarm64.sh
+./buildlinuxarm64.sh
+```
+
+8. All files needed will now be in ~/omtplayer/build/arm64
+
+9. Run ~/omtplayer/build/arm64/omtplayer to start the decoder.
+
+```
+~/omtplayer/build/arm64/omtplayer
+```
 
 10. **Important:** Make sure the HDMI display is connected to HDMI 1 on the Pi. This is the HDMI port directly next to the USB-C power port.
 
@@ -85,8 +117,19 @@ http://piipaddress:8080/
 
 This configures the app to run automatically when the device starts up.
 
-1. Copy the omtplayer files into a folder called /opt/omtplayer on the system.
+1. Copy the omtplayer files from ~/omtplayer/build/arm64 into a folder called /opt/omtplayer on the system.
+
+```
+mkdir /opt/omtplayer
+cp ~/omtplayer/build/arm64/* /opt/omtplayer/*
+```
+
 2. Copy the omtplayer.service template into the /etc/systemd/system/ folder.
+
+```
+sudo cp ~/omtplayer/omtplayer.service /etc/systemd/system/
+```
+
 3. Reload systemctl and enable the service
 
 ```
