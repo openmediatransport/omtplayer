@@ -29,6 +29,12 @@ Interlaces sources will be displayed as progressive without any deinterlacing. T
 
 ## Instructions
 
+It is recommended to update the Raspberry Pi package manager before proceeding further:
+
+```
+sudo apt update
+```
+
 1. Ensure that the Raspberry Pi OS is configued to boot to Console instead of Desktop.
 
 omtplayer outputs directly to the display which is not possible when the Desktop mode is running.
@@ -39,11 +45,19 @@ This can be changed by running:
 sudo raspi-config
 ```
 
-And selecting Console under Boot Options - Desktop / CLI
+And selecting Console under 1 System Options - S5 Boot - B1 Console Text console
 
 2. Install dotnet 8 on to device.
 
-Instructions can be found here:
+```
+curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --channel 8.0
+
+echo 'export DOTNET_ROOT=$HOME/.dotnet' >> ~/.bashrc
+echo 'export PATH=$PATH:$HOME/.dotnet' >> ~/.bashrc
+source ~/.bashrc
+```
+
+For reference, the latest instructions that include the above commands are below:
 https://learn.microsoft.com/en-us/dotnet/iot/deployment
 
 **Important:** The --channel parameter should be set to 8.0
@@ -103,7 +117,7 @@ chmod 755 buildlinuxarm64.sh
 ~/omtplayer/build/arm64/omtplayer
 ```
 
-10. **Important:** Make sure the HDMI display is connected to HDMI 1 on the Pi. This is the HDMI port directly next to the USB-C power port.
+10. **Important:** Make sure the HDMI display is connected to HDMI port numbered 0 on the Pi. This is the HDMI port directly next to the USB-C power port.
 
 11. Open a browser on another computer on the same network and connect to the web server to configure a source to connect to
 
