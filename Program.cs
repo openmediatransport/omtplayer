@@ -24,6 +24,7 @@
 */
 
 using libomtnet;
+using omtplayer.audio;
 using omtplayer.drm;
 using omtplayer.web;
 
@@ -53,13 +54,17 @@ namespace omtplayer
         static void Main(string[] args)
         {
             Console.WriteLine("OMT Player");
+            DRMDevice? dev = null;
+            DRMPresenter? presenter = null;
+            OMTReceive? receiver = null;
+            AudioPlaybackService? audioPlayback = null;
             try
             {
                 server = new WebServer();
                 Console.CancelKeyPress += Console_CancelKeyPress;
+                audioPlayback = new AudioPlaybackService(WriteLog);
 
                 string devicePath = "/dev/dri/card1";
-                DRMDevice? dev = null;
                 dev = new DRMDevice(devicePath);
                 WriteLog("DisplayDevice.Opened: " + devicePath);
                 DRMConnector? connector = null;
@@ -94,58 +99,65 @@ namespace omtplayer
                         }
                     }
 
-                    DRMPresenter? presenter = null;
                     int currentWidth = 0;
                     int currentHeight = 0;
                     bool currentInterlaced = false;
                     float currentFrameRate = 0;
                     string currentSource = server.Source;
 
-                    OMTReceive r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
+                    receiver = new OMTReceive(currentSource, OMTFrameType.Video | OMTFrameType.Audio, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
                     OMTMediaFrame frame = new OMTMediaFrame();
                     while (running)
                     {
                         if (currentSource != server.Source)
                         {
                             WriteLog("Source.Changed: " + server.Source);
-                            r.Dispose();
+                            audioPlayback.Reset("SourceChanged");
+                            receiver.Dispose();
                             currentSource = server.Source;
-                            r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
+                            receiver = new OMTReceive(currentSource, OMTFrameType.Video | OMTFrameType.Audio, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
                         }
-                        if (r.Receive(OMTFrameType.Video, 500, ref frame))
+                        if (receiver.Receive(OMTFrameType.Video | OMTFrameType.Audio, 500, ref frame))
                         {
-                            bool interlaced = false;
-                            if (frame.Flags.HasFlag(OMTVideoFlags.Interlaced)) interlaced = true;
-                            if (currentWidth != frame.Width || currentHeight != frame.Height || currentFrameRate != frame.FrameRate || currentInterlaced != interlaced)
+                            if (frame.Type == OMTFrameType.Video)
                             {
-                                currentWidth = frame.Width;
-                                currentHeight = frame.Height;
-                                currentFrameRate = frame.FrameRate;
-                                currentInterlaced = interlaced;
+                                bool interlaced = false;
+                                if (frame.Flags.HasFlag(OMTVideoFlags.Interlaced)) interlaced = true;
+                                if (currentWidth != frame.Width || currentHeight != frame.Height || currentFrameRate != frame.FrameRate || currentInterlaced != interlaced)
+                                {
+                                    currentWidth = frame.Width;
+                                    currentHeight = frame.Height;
+                                    currentFrameRate = frame.FrameRate;
+                                    currentInterlaced = interlaced;
+                                    if (presenter != null)
+                                    {
+                                        dev.SetPresenter(null);
+                                        presenter.Dispose();
+                                        presenter = null;
+                                        WriteLog("Presenter.Clear");
+                                    }
+                                    WriteLog("Receive.NewFormat: " + frame.Width + "x" + frame.Height + " " + frame.FrameRate.ToString());
+                                    DRMMode? mode = connector.FindNearestMode(frame.Width, frame.Height, frame.FrameRate, false);
+                                    if (mode != null)
+                                    {
+                                        WriteLog("Presenter.NearestMatch: " + mode.ToString());
+                                        presenter = new DRMPresenter(dev, connector, mode, 3);
+                                        dev.SetPresenter(presenter);
+                                        WriteLog("Presenter.Created");
+                                    }
+                                    else
+                                    {
+                                        WriteLog("Presenter.NoDisplayModesFound");
+                                    }
+                                }
                                 if (presenter != null)
                                 {
-                                    dev.SetPresenter(null);
-                                    presenter.Dispose();
-                                    presenter = null;
-                                    WriteLog("Presenter.Clear");
-                                }
-                                WriteLog("Receive.NewFormat: " + frame.Width + "x" + frame.Height + " " + frame.FrameRate.ToString());
-                                DRMMode? mode = connector.FindNearestMode(frame.Width, frame.Height, frame.FrameRate, false);
-                                if (mode != null)
-                                {
-                                    WriteLog("Presenter.NearestMatch: " + mode.ToString());
-                                    presenter = new DRMPresenter(dev, connector, mode, 3);
-                                    dev.SetPresenter(presenter);
-                                    WriteLog("Presenter.Created");
-                                }
-                                else
-                                {
-                                    WriteLog("Presenter.NoDisplayModesFound");
+                                    presenter.Enqueue(frame.Data, frame.Stride);
                                 }
                             }
-                            if (presenter != null)
+                            else if (frame.Type == OMTFrameType.Audio)
                             {
-                                presenter.Enqueue(frame.Data, frame.Stride);
+                                audioPlayback.Submit(frame);
                             }
                         }
                         else
@@ -153,14 +165,25 @@ namespace omtplayer
                             WriteLog("Receive.NoFrame");
                         }
                     }
-                    if (r != null)
-                    {
-                        r.Dispose();
-                    }
-                    if (presenter != null)
-                    {
-                        presenter.Dispose();
-                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+            finally
+            {
+                if (receiver != null)
+                {
+                    receiver.Dispose();
+                }
+                if (audioPlayback != null)
+                {
+                    audioPlayback.Dispose();
+                }
+                if (presenter != null)
+                {
+                    presenter.Dispose();
                 }
                 if (dev != null)
                 {
@@ -170,10 +193,6 @@ namespace omtplayer
                 {
                     server.StopServer();
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
             }
         }
 
