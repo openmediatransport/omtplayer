@@ -23,6 +23,7 @@
 *
 */
 
+using System.Runtime.InteropServices;
 using libomtnet;
 using omtplayer.audio;
 using omtplayer.drm;
@@ -33,7 +34,8 @@ namespace omtplayer
     internal class Program
     {
         private static WebServer? server = null;
-        private static bool running = true;
+        private static volatile bool running = true;
+        private static int shutdownRequested = 0;
 
         static void WriteLog(string message)
         {
@@ -46,9 +48,23 @@ namespace omtplayer
 
         static void Console_CancelKeyPress(object? sender, ConsoleCancelEventArgs e)
         {
-            Console.WriteLine("Closing...");
-            running = false;
+            RequestShutdown("Ctrl+C");
             e.Cancel = true;
+        }
+
+        static void RequestShutdown(string reason)
+        {
+            if (Interlocked.Exchange(ref shutdownRequested, 1) == 0)
+            {
+                WriteLog("Shutdown.Requested: " + reason);
+            }
+            running = false;
+        }
+
+        static void HandlePosixSignal(PosixSignalContext context)
+        {
+            RequestShutdown(context.Signal.ToString());
+            context.Cancel = true;
         }
 
         static void Main(string[] args)
@@ -58,10 +74,17 @@ namespace omtplayer
             DRMPresenter? presenter = null;
             OMTReceive? receiver = null;
             AudioPlaybackService? audioPlayback = null;
+            PosixSignalRegistration? sigIntRegistration = null;
+            PosixSignalRegistration? sigTermRegistration = null;
             try
             {
                 server = new WebServer();
                 Console.CancelKeyPress += Console_CancelKeyPress;
+                if (OperatingSystem.IsLinux())
+                {
+                    sigIntRegistration = PosixSignalRegistration.Create(PosixSignal.SIGINT, HandlePosixSignal);
+                    sigTermRegistration = PosixSignalRegistration.Create(PosixSignal.SIGTERM, HandlePosixSignal);
+                }
                 audioPlayback = new AudioPlaybackService(WriteLog);
 
                 string devicePath = "/dev/dri/card1";
@@ -70,6 +93,10 @@ namespace omtplayer
                 DRMConnector? connector = null;
                 while (connector == null)
                 {
+                    if (server.ShutdownRequested)
+                    {
+                        RequestShutdown("WebUI");
+                    }
                     connector = dev.GetFirstActiveConnector();
                     if (connector == null)
                     {
@@ -109,6 +136,11 @@ namespace omtplayer
                     OMTMediaFrame frame = new OMTMediaFrame();
                     while (running)
                     {
+                        if (server.ShutdownRequested)
+                        {
+                            RequestShutdown("WebUI");
+                            continue;
+                        }
                         if (currentSource != server.Source)
                         {
                             WriteLog("Source.Changed: " + server.Source);
@@ -173,6 +205,8 @@ namespace omtplayer
             }
             finally
             {
+                sigIntRegistration?.Dispose();
+                sigTermRegistration?.Dispose();
                 if (receiver != null)
                 {
                     receiver.Dispose();

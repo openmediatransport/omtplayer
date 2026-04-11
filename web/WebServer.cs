@@ -41,6 +41,7 @@ namespace omtplayer.web
         private List<string> log = new List<string>();
         private OMTSettings settings;
         private int port = 8080;
+        private volatile bool shutdownRequested = false;
 
         private const int MAX_LOG_LINES = 256;
 
@@ -102,6 +103,8 @@ namespace omtplayer.web
 
         public int Port { get { return port; } }
 
+        public bool ShutdownRequested { get { return shutdownRequested; } }
+
         private void ChangeSource(string newSource)
         {
             if (this.source != newSource)
@@ -110,6 +113,15 @@ namespace omtplayer.web
                 settings.SetString("Source", newSource);
                 settings.Save();
                 WriteLog("SourceChanged: " + newSource);
+            }
+        }
+
+        private void RequestShutdown()
+        {
+            if (!shutdownRequested)
+            {
+                shutdownRequested = true;
+                WriteLog("ShutdownRequested: WebUI");
             }
         }
 
@@ -134,6 +146,10 @@ namespace omtplayer.web
                                     }
                                 }
                             }
+                        }
+                        if (ctx.Request.Form.ContainsKey("cmdStop"))
+                        {
+                            RequestShutdown();
                         }
 
                     }
