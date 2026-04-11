@@ -6,6 +6,9 @@ namespace omtplayer.audio
 {
     internal sealed class AudioPlaybackService : IDisposable
     {
+        private const int StartupBufferMilliseconds = 15;
+        private const int MaxQueueMilliseconds = 120;
+
         private readonly Action<string> log;
         private readonly AudioJitterBuffer jitterBuffer = new AudioJitterBuffer();
         private readonly object stateSync = new object();
@@ -51,11 +54,11 @@ namespace omtplayer.audio
                     requestedFormat = format;
                     formatChangePending = true;
                     clearBuffer = true;
-                    startThresholdFrames = Math.Max(format.SampleRate / 10, format.SamplesPerChannel * 3);
-                    maxBufferedFrames = Math.Max(format.SampleRate / 2, format.SamplesPerChannel * 8);
+                    startThresholdFrames = Math.Max((format.SampleRate * StartupBufferMilliseconds) / 1000, format.SamplesPerChannel);
+                    maxBufferedFrames = Math.Max((format.SampleRate * MaxQueueMilliseconds) / 1000, format.SamplesPerChannel * 3);
                 }
 
-                maxFrames = maxBufferedFrames > 0 ? maxBufferedFrames : Math.Max(format.SampleRate / 2, format.SamplesPerChannel * 8);
+                maxFrames = maxBufferedFrames > 0 ? maxBufferedFrames : Math.Max((format.SampleRate * MaxQueueMilliseconds) / 1000, format.SamplesPerChannel * 3);
             }
 
             if (clearBuffer)
@@ -135,18 +138,20 @@ namespace omtplayer.audio
                         }
                     }
 
-                    if (currentBlock.Format != activeFormat)
+                    AudioInputBlock block = currentBlock!;
+
+                    if (block.Format != activeFormat)
                     {
-                        currentBlock.Dispose();
+                        block.Dispose();
                         currentBlock = null;
                         playbackStarted = false;
                         continue;
                     }
 
-                    interleavedBuffer = EnsureInterleavedBuffer(interleavedBuffer, currentBlock.FrameCount * output.OutputChannels);
-                    ConvertPlanarToOutput(currentBlock, interleavedBuffer, output.OutputChannels);
+                    interleavedBuffer = EnsureInterleavedBuffer(interleavedBuffer, block.FrameCount * output.OutputChannels);
+                    ConvertPlanarToOutput(block, interleavedBuffer, output.OutputChannels);
 
-                    int framesRemaining = currentBlock.FrameCount;
+                    int framesRemaining = block.FrameCount;
                     int frameOffset = 0;
                     while (framesRemaining > 0 && running)
                     {
@@ -166,7 +171,7 @@ namespace omtplayer.audio
                         framesRemaining -= written;
                     }
 
-                    currentBlock.Dispose();
+                    block.Dispose();
                     currentBlock = null;
                 }
                 catch (Exception ex)

@@ -26,6 +26,8 @@ namespace omtplayer.audio
         private const int SND_PCM_STREAM_PLAYBACK = 0;
         private const int SND_PCM_ACCESS_RW_INTERLEAVED = 3;
         private const int SND_PCM_FORMAT_FLOAT_LE = 14;
+        private const int TargetPeriodMilliseconds = 10;
+        private const int TargetBufferMilliseconds = 40;
 
         private static readonly string[] DefaultDevices =
         {
@@ -66,12 +68,13 @@ namespace omtplayer.audio
 
                 if (TryOpenDevice(deviceName, format, out AlsaOpenResult? result, out string? error))
                 {
-                    OutputChannels = result.OutputChannels;
-                    SampleRate = result.SampleRate;
-                    PeriodFrames = result.PeriodFrames;
-                    BufferFrames = result.BufferFrames;
-                    DeviceName = result.DeviceName;
-                    return result;
+                    AlsaOpenResult opened = result!;
+                    OutputChannels = opened.OutputChannels;
+                    SampleRate = opened.SampleRate;
+                    PeriodFrames = opened.PeriodFrames;
+                    BufferFrames = opened.BufferFrames;
+                    DeviceName = opened.DeviceName;
+                    return opened;
                 }
 
                 if (!string.IsNullOrWhiteSpace(error))
@@ -170,6 +173,7 @@ namespace omtplayer.audio
             error = null;
             IntPtr localHandle = IntPtr.Zero;
             IntPtr hwParams = IntPtr.Zero;
+            IntPtr swParams = IntPtr.Zero;
 
             try
             {
@@ -239,7 +243,7 @@ namespace omtplayer.audio
                     return false;
                 }
 
-                ulong periodFrames = (ulong)Math.Max(256, Math.Min(format.SamplesPerChannel, 2048));
+                ulong periodFrames = (ulong)Math.Max(128, Math.Min(Math.Max((format.SampleRate * TargetPeriodMilliseconds) / 1000, 128), format.SamplesPerChannel));
                 dir = 0;
                 hr = snd_pcm_hw_params_set_period_size_near(localHandle, hwParams, ref periodFrames, ref dir);
                 if (hr < 0)
@@ -248,7 +252,7 @@ namespace omtplayer.audio
                     return false;
                 }
 
-                ulong bufferFrames = Math.Max(periodFrames * 4, (ulong)Math.Max(format.SampleRate / 5, format.SamplesPerChannel * 4));
+                ulong bufferFrames = Math.Max(periodFrames * 3, (ulong)Math.Max((format.SampleRate * TargetBufferMilliseconds) / 1000, format.SamplesPerChannel * 2));
                 hr = snd_pcm_hw_params_set_buffer_size_near(localHandle, hwParams, ref bufferFrames);
                 if (hr < 0)
                 {
@@ -257,6 +261,41 @@ namespace omtplayer.audio
                 }
 
                 hr = snd_pcm_hw_params(localHandle, hwParams);
+                if (hr < 0)
+                {
+                    error = GetError(hr);
+                    return false;
+                }
+
+                hr = snd_pcm_sw_params_malloc(ref swParams);
+                if (hr < 0)
+                {
+                    error = GetError(hr);
+                    return false;
+                }
+
+                hr = snd_pcm_sw_params_current(localHandle, swParams);
+                if (hr < 0)
+                {
+                    error = GetError(hr);
+                    return false;
+                }
+
+                hr = snd_pcm_sw_params_set_start_threshold(localHandle, swParams, periodFrames);
+                if (hr < 0)
+                {
+                    error = GetError(hr);
+                    return false;
+                }
+
+                hr = snd_pcm_sw_params_set_avail_min(localHandle, swParams, periodFrames);
+                if (hr < 0)
+                {
+                    error = GetError(hr);
+                    return false;
+                }
+
+                hr = snd_pcm_sw_params(localHandle, swParams);
                 if (hr < 0)
                 {
                     error = GetError(hr);
@@ -283,6 +322,10 @@ namespace omtplayer.audio
                 if (hwParams != IntPtr.Zero)
                 {
                     snd_pcm_hw_params_free(hwParams);
+                }
+                if (swParams != IntPtr.Zero)
+                {
+                    snd_pcm_sw_params_free(swParams);
                 }
                 if (localHandle != IntPtr.Zero)
                 {
@@ -378,6 +421,24 @@ namespace omtplayer.audio
 
         [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
         private static extern int snd_pcm_hw_params_test_channels(IntPtr pcm, IntPtr hwParams, uint channels);
+
+        [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int snd_pcm_sw_params_malloc(ref IntPtr ptr);
+
+        [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void snd_pcm_sw_params_free(IntPtr obj);
+
+        [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int snd_pcm_sw_params_current(IntPtr pcm, IntPtr swParams);
+
+        [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int snd_pcm_sw_params(IntPtr pcm, IntPtr swParams);
+
+        [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int snd_pcm_sw_params_set_start_threshold(IntPtr pcm, IntPtr swParams, ulong val);
+
+        [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int snd_pcm_sw_params_set_avail_min(IntPtr pcm, IntPtr swParams, ulong val);
 
         [DllImport(AsoundLibrary, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr snd_strerror(int errnum);
