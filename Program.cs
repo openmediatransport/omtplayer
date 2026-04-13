@@ -31,8 +31,13 @@ namespace omtplayer
 {
     internal class Program
     {
+        private const string DISPLAY_DEVICE_PATH = "/dev/dri/card1";
+        private const string AUDIO_DEVICE_PATH = "default";
+
         private static WebServer? server = null;
-        private static bool running = true;
+        private static volatile bool running = true;
+        private static Thread? audioThread = null;
+        private static bool audioThreadRunning = false;
 
         static void WriteLog(string message)
         {
@@ -50,6 +55,12 @@ namespace omtplayer
             e.Cancel = true;
         }
 
+        static void WebServer_ShutdownRequested(object? sender, EventArgs e)
+        {
+            Console.WriteLine("Shutdown requested by Web Server...");
+            running = false;
+        }
+
         static void Main(string[] args)
         {
             Console.WriteLine("OMT Player");
@@ -57,8 +68,9 @@ namespace omtplayer
             {
                 server = new WebServer();
                 Console.CancelKeyPress += Console_CancelKeyPress;
+                server.ShutdownRequested += WebServer_ShutdownRequested;
 
-                string devicePath = "/dev/dri/card1";
+                string devicePath = DISPLAY_DEVICE_PATH;
                 DRMDevice? dev = null;
                 dev = new DRMDevice(devicePath);
                 WriteLog("DisplayDevice.Opened: " + devicePath);
@@ -101,16 +113,20 @@ namespace omtplayer
                     float currentFrameRate = 0;
                     string currentSource = server.Source;
 
-                    OMTReceive r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
+                    OMTReceive r = new OMTReceive(currentSource, OMTFrameType.Video | OMTFrameType.Audio, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
                     OMTMediaFrame frame = new OMTMediaFrame();
+                    StartAudioPlayer(r);
+
                     while (running)
                     {
                         if (currentSource != server.Source)
                         {
                             WriteLog("Source.Changed: " + server.Source);
+                            StopAudioPlayer();
                             r.Dispose();
                             currentSource = server.Source;
-                            r = new OMTReceive(currentSource, OMTFrameType.Video, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
+                            r = new OMTReceive(currentSource, OMTFrameType.Video | OMTFrameType.Audio, OMTPreferredVideoFormat.BGRA, OMTReceiveFlags.None);
+                            StartAudioPlayer(r);
                         }
                         if (r.Receive(OMTFrameType.Video, 500, ref frame))
                         {
@@ -153,6 +169,7 @@ namespace omtplayer
                             WriteLog("Receive.NoFrame");
                         }
                     }
+                    StopAudioPlayer();
                     if (r != null)
                     {
                         r.Dispose();
@@ -160,7 +177,7 @@ namespace omtplayer
                     if (presenter != null)
                     {
                         presenter.Dispose();
-                    }
+                    }                    
                 }
                 if (dev != null)
                 {
@@ -174,6 +191,76 @@ namespace omtplayer
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
+            }
+        }
+        static void StartAudioPlayer(OMTReceive r)
+        {
+            StopAudioPlayer();
+            audioThreadRunning = true;
+            audioThread = new Thread(audioPlayer);
+            audioThread.IsBackground = true;
+            audioThread.Start(r);
+        }
+        static void StopAudioPlayer()
+        {
+            audioThreadRunning = false;
+            if (audioThread != null)
+            {
+                lock (audioThread)
+                {
+                    audioThread = null;
+                }
+            }
+        }
+
+        static void audioPlayer(object? state)
+        {
+            try
+            {
+                if (audioThread != null)
+                {
+                    lock (audioThread)
+                    {
+                        WriteLog("Audio.Thread.Started");
+                        if (state != null)
+                        {
+                            OMTMediaFrame frame = new OMTMediaFrame();
+                            OMTReceive r = (OMTReceive)state;
+                            ALSAPlayer? player = null;
+                            while (audioThreadRunning)
+                            {
+                                if (r.Receive(OMTFrameType.Audio, 100, ref frame))
+                                {
+                                    if (player == null || player.Channels != frame.Channels || player.SampleRate != frame.SampleRate)
+                                    {
+                                        WriteLog("Audio.Format: " + frame.SampleRate + " hz " + frame.Channels + " ch");
+                                        if (player != null) player.Dispose();
+                                        player = new ALSAPlayer(AUDIO_DEVICE_PATH, (uint)frame.SampleRate, (uint)frame.Channels);
+                                    }
+                                    //This is the simplest way to manage audio drift/sync, by skipping audio if it is likely this function will block due to a full device buffer.
+                                    //This should in theory limit the latency to a max of LATENCY_US (60ms)
+                                    int available = player.GetBufferAvailable();
+                                    if (available >= frame.SamplesPerChannel)
+                                    {
+                                        player.WritePlanar(frame.Data, (uint)frame.SamplesPerChannel);
+                                    } else
+                                    {
+                                        WriteLog("Audio.Skip: " + frame.SamplesPerChannel + "|" + available);
+                                    }
+                                }
+                            }
+                            if (player != null)
+                            {
+                                player.Dispose();
+                            }
+                        }
+                        WriteLog("Audio.Thread.Stopped");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog(ex.ToString());
             }
         }
 

@@ -1,19 +1,44 @@
 ﻿<html>
 <head>
     <title>OMT Player</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: sans-serif;
+            font-size: 12px;
+        }
+        textarea {
+            background-color: midnightblue;
+            color: greenyellow;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 4px;
+        }
+        h1 {
+            font-family: sans-serif;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+        }
+    </style>
 </head>
 <body>
+    <img src="/images/logo.png" alt="OMT Player" title="OMT Player" />
     <form action="/" method="post">
+        <h1>Source</h1>
         <select name="cboSource" id="cboSource" style="width: 300px">
             #SOURCES#
         </select>
         <button id="cmdChange" name="cmdChange">Apply Source</button>
         <button id="cmdRefresh" name="cmdRefresh">Refresh List</button>
+
+        <h1>Commands</h1>
+        <button id="cmdShutdown" name="cmdShutdown">Shutdown Player</button>
     </form> 
+    <h1>Log</h1>
     <p>
-        <textarea style="width: 600px; height: 600px;" readonly>
-            #LOG#
-        </textarea>
+        <textarea style="width: 600px; height: 600px;" readonly>#LOG#</textarea>
     </p>
 </body>
 </html>

@@ -59,12 +59,44 @@ namespace omtplayer.Properties {
                 resourceCulture = value;
             }
         }
-
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &lt;html&gt;
+        ///&lt;head&gt;
+        ///    &lt;title&gt;OMT Player&lt;/title&gt;
+        ///    &lt;style&gt;
+        ///        body {
+        ///            background-color: black;
+        ///            color: white;
+        ///            font-family: sans-serif;
+        ///            font-size: 12px;
+        ///        }
+        ///        textarea {
+        ///            background-color: midnightblue;
+        ///            color: greenyellow;
+        ///            font-family: serif;
+        ///            font-size: 12px;
+        ///            padding: 4px;
+        ///        }
+        ///        h1 {
+        ///            font-family: sans-serif;
+        ///            font-size: 16px;
+        ///            [rest of string was truncated]&quot;;.
+        /// </summary>
         internal static string index {
             get {
                 return ResourceManager.GetString("index", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] logo {
+            get {
+                object obj = ResourceManager.GetObject("logo", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }

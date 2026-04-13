@@ -44,6 +44,9 @@ namespace omtplayer.web
 
         private const int MAX_LOG_LINES = 256;
 
+        public delegate void ShutdownRequestedDelegate(object? sender, EventArgs e);
+        public event ShutdownRequestedDelegate? ShutdownRequested;
+
         private sealed class NoopLifetime : IHostLifetime
         {
             public Task WaitForStartAsync(CancellationToken _) => Task.CompletedTask;
@@ -60,6 +63,7 @@ namespace omtplayer.web
             app = builder.Build();
             requestDelegate = new RequestDelegate(pageHandler);
             app.MapGet("/", requestDelegate);
+            app.MapGet("/images/logo.png", requestDelegate);
             app.MapPost("/", requestDelegate);
             app.Start();
             WriteLog("WebServer.Port: " + port);
@@ -134,8 +138,10 @@ namespace omtplayer.web
                                     }
                                 }
                             }
+                        } else if (ctx.Request.Form.ContainsKey("cmdShutdown"))
+                        {
+                            ShutdownRequested?.Invoke(this, EventArgs.Empty);
                         }
-
                     }
                     ctx.Response.ContentType = "text/html; charset=utf-8";
                     OMTDiscovery discovery = OMTDiscovery.GetInstance();
@@ -155,6 +161,10 @@ namespace omtplayer.web
                     html = html.Replace("#LOG#", GetReverseLog());
 
                     return ctx.Response.WriteAsync(html);
+                case "/images/logo.png":
+                    ctx.Response.ContentType = "image/png";
+                    ctx.Response.BodyWriter.WriteAsync(Properties.Resources.logo);
+                    return ctx.Response.CompleteAsync();
                 default:
                     ctx.Response.StatusCode = 404;
                     return ctx.Response.WriteAsync("");

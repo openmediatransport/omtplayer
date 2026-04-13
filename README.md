@@ -2,7 +2,11 @@
 
 **omtplayer** is a decoder for Raspbery Pi 5 that can display an OMT source via the HDMI port at up to 1080p60.
 
-A built in web server runs on port 8080 by default allowing sources to be selected for display.
+## Features
+
+* Supports video playback up to 1080p60 where supported by the connected display.
+* Supports audio playback which by default will output via the HDMI port. 
+* Built-in web server for managing the source and viewing logs.
 
 ## Requirements
 
@@ -26,6 +30,12 @@ Decoding will not proceed if it is unable to find an exact resolution match. (St
 Frame rates are more flexible and the app will auto select 60hz if an exact match is not available. (Monitors generally support higher frame rates of 50, 59.94 and 60hz while TVs also support lower frame rates directly such as 25 and 29.97)
 
 Interlaces sources will be displayed as progressive without any deinterlacing. This is due to the Linux DRM API limitations in detecting field order.
+
+## Audio Formats
+
+**omtplayer** will attempt to output to the default audio device in the format it receives.
+
+If the audio format is not supported by the audio device or connected display, video will continue to play without audio.
 
 ## Instructions
 
