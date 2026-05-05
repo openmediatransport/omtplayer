@@ -16,6 +16,12 @@ internal class ALSAPlayer : IDisposable
     private float[] srcSamples = { };
     private float[] dstSamples = { };
 
+    private enum _snd_pcm_stream_t
+    {
+        SND_PCM_STREAM_PLAYBACK = 0,
+        SND_PCM_STREAM_CAPTURE,
+    }
+
     private enum _snd_pcm_format_t
     {
         SND_PCM_FORMAT_UNKNOWN = -1,
@@ -37,6 +43,8 @@ internal class ALSAPlayer : IDisposable
         SND_PCM_FORMAT_FLOAT_BE,
     }
 
+    private const uint SND_PCM_NONBLOCK = 0x0001;
+
     private enum _snd_pcm_access_t
     {
         SND_PCM_ACCESS_MMAP_INTERLEAVED = 0,
@@ -48,7 +56,7 @@ internal class ALSAPlayer : IDisposable
     }
 
     [DllImport(Lib, CharSet = CharSet.Ansi)]
-    private static extern int snd_pcm_open(ref IntPtr pcm, string name, int stream, int mode);
+    private static extern int snd_pcm_open(ref IntPtr pcm, string name, _snd_pcm_stream_t stream, int mode);
 
     [DllImport(Lib)]
     private static extern int snd_pcm_close(IntPtr pcm);
@@ -66,6 +74,9 @@ internal class ALSAPlayer : IDisposable
     private static extern int snd_pcm_writei(IntPtr pcm, [MarshalAs(UnmanagedType.LPArray)] float[] buffer, uint size);
 
     [DllImport(Lib)]
+    private static extern int snd_pcm_recover(IntPtr pcm, int err, int silent);
+
+    [DllImport(Lib)]
     private static extern int snd_pcm_prepare(IntPtr pcm);
 
     [DllImport(Lib)]
@@ -78,7 +89,7 @@ internal class ALSAPlayer : IDisposable
     {
         this.channels = channels;
         this.sampleRate = sampleRate;
-        int hr = snd_pcm_open(ref pcmHandle, deviceName, 0, 0);
+        int hr = snd_pcm_open(ref pcmHandle, deviceName, _snd_pcm_stream_t.SND_PCM_STREAM_PLAYBACK, 0);
         if (hr != 0)
         {
             throw new Exception("Unable to open audio device " + deviceName + ": " + hr);
@@ -109,18 +120,42 @@ internal class ALSAPlayer : IDisposable
     {
         StartStream();
         int frames = snd_pcm_writei(pcmHandle, buffer, samplesPerChannel);
+        if (frames < 0)
+        {
+            int err = snd_pcm_recover(pcmHandle, frames, 1);
+            if (err < 0)
+            {
+                throw new Exception("Unable to revover sound device.");
+            }
+        }
         return frames;
     }
     public int WriteInterleaved(byte[] buffer, uint samplesPerChannel)
     {
         StartStream();
         int frames = snd_pcm_writei(pcmHandle, buffer, samplesPerChannel);
+        if (frames < 0)
+        {
+            int err = snd_pcm_recover(pcmHandle, frames, 1);
+            if (err < 0)
+            {
+                throw new Exception("Unable to revover sound device.");
+            }
+        }
         return frames;
     }
     public int WriteInterleaved(float[] buffer, uint samplesPerChannel)
     {
         StartStream();
         int frames = snd_pcm_writei(pcmHandle, buffer, samplesPerChannel);
+        if (frames < 0)
+        {
+            int err = snd_pcm_recover(pcmHandle, frames, 1);
+            if (err < 0)
+            {
+                throw new Exception("Unable to revover sound device.");
+            }
+        }
         return frames;
     }
 

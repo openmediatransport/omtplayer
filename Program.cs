@@ -237,16 +237,7 @@ namespace omtplayer
                                         if (player != null) player.Dispose();
                                         player = new ALSAPlayer(AUDIO_DEVICE_PATH, (uint)frame.SampleRate, (uint)frame.Channels);
                                     }
-                                    //This is the simplest way to manage audio drift/sync, by skipping audio if it is likely this function will block due to a full device buffer.
-                                    //This should in theory limit the latency to a max of LATENCY_US (60ms)
-                                    int available = player.GetBufferAvailable();
-                                    if (available >= frame.SamplesPerChannel)
-                                    {
-                                        player.WritePlanar(frame.Data, (uint)frame.SamplesPerChannel);
-                                    } else
-                                    {
-                                        WriteLog("Audio.Skip: " + frame.SamplesPerChannel + "|" + available);
-                                    }
+                                    player.WritePlanar(frame.Data, (uint)frame.SamplesPerChannel);
                                 }
                             }
                             if (player != null)
