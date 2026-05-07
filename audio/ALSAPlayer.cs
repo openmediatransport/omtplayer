@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using static System.Runtime.CompilerServices.RuntimeHelpers;
 
 internal class ALSAPlayer : IDisposable
 {
@@ -7,6 +8,9 @@ internal class ALSAPlayer : IDisposable
     private bool disposedValue;
     private const uint LATENCY_US = 60000; //Where 1,000,000 = 1 second
     private const uint BYTES_PER_SAMPLE = 4;
+
+    private const int ESTRPIPE = 86;
+    private const int EPIPE = 32;
 
     private uint channels;
     private uint sampleRate;
@@ -73,6 +77,9 @@ internal class ALSAPlayer : IDisposable
 
     [DllImport(Lib)]
     private static extern int snd_pcm_avail_update(IntPtr pcm);
+
+    [DllImport(Lib)]
+    private static extern int snd_pcm_recover(IntPtr pcm, int err, int silent);
 
     public ALSAPlayer(string deviceName, uint sampleRate, uint channels)
     {
@@ -147,7 +154,18 @@ internal class ALSAPlayer : IDisposable
 
     public int GetBufferAvailable()
     {
-        return snd_pcm_avail_update(pcmHandle);
+        int available = snd_pcm_avail_update(pcmHandle);
+        if (available < 0)
+        {
+            //Recover stream in cases of underrun and suspend
+            if (available == -EPIPE || available == -ESTRPIPE)
+            {
+                int err = snd_pcm_recover(pcmHandle, available, 1);
+                available = snd_pcm_avail_update(pcmHandle);
+                Console.WriteLine("ASLA.RecoveredStream: " + err + "|" + available);
+            }
+        }
+        return available;
     }
 
     protected virtual void Dispose(bool disposing)
