@@ -29,7 +29,7 @@ Decoding will not proceed if it is unable to find an exact resolution match. (St
 
 Frame rates are more flexible and the app will auto select 60hz if an exact match is not available. (Monitors generally support higher frame rates of 50, 59.94 and 60hz while TVs also support lower frame rates directly such as 25 and 29.97)
 
-Interlaces sources will be displayed as progressive without any deinterlacing. This is due to the Linux DRM API limitations in detecting field order.
+Interlaced sources will be displayed as progressive without any deinterlacing. This is due to the Linux DRM API limitations in detecting field order.
 
 ## Audio Formats
 
@@ -47,7 +47,9 @@ sudo apt update
 
 1. Ensure that the Raspberry Pi OS is configued to boot to Console instead of Desktop.
 
-omtplayer outputs directly to the display which is not possible when the Desktop mode is running.
+omtplayer outputs directly to the display device which is not possible when the Desktop mode is running.
+
+For running with audio as a system service, it is recommended to configure audio to use the pulseaudio backend.
 
 This can be changed by running:
 
@@ -55,7 +57,9 @@ This can be changed by running:
 sudo raspi-config
 ```
 
-And selecting Console under 1 System Options - S5 Boot - B1 Console Text console
+Text console mode is selected under: 1 System Options - S5 Boot - B1 Console Text console
+
+Audio backend is selected under: 6 Advanced Options -  A8 Audio Config - 1 PulseAudio
 
 2. Install dotnet 8 on to device.
 
@@ -148,10 +152,11 @@ sudo mkdir /opt/omtplayer
 sudo cp ~/omtplayer/build/arm64/* /opt/omtplayer/
 ```
 
-2. Copy the omtplayer.service template into the /etc/systemd/system/ folder.
+2. Copy the omtplayer.service template into the /etc/systemd/system/ folder and change the user and group to the current user and group.
 
 ```
 sudo cp ~/omtplayer/omtplayer.service /etc/systemd/system/
+sudo sed -i "/User=/s/.*/User=`whoami`/;/Group=/s/.*/Group=`id -ng`/" /tmp/omtplayer.service
 ```
 
 3. Reload systemctl and enable the service
