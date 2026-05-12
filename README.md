@@ -156,7 +156,7 @@ sudo cp ~/omtplayer/build/arm64/* /opt/omtplayer/
 
 ```
 sudo cp ~/omtplayer/omtplayer.service /etc/systemd/system/
-sudo sed -i "/User=/s/.*/User=`whoami`/;/Group=/s/.*/Group=`id -ng`/" /tmp/omtplayer.service
+sudo sed -i "/User=/s/.*/User=`whoami`/;/Group=/s/.*/Group=`id -ng`/" /etc/systemd/system/omtplayer.service
 ```
 
 3. Reload systemctl and enable the service
